@@ -1,0 +1,51 @@
+language: crystal
+sudo: required
+
+matrix:
+  include:
+  - os: linux
+    dist: trusty
+    env: LLVM_VERSION=3.9
+
+before_install: |
+  set -e
+  set -x
+
+  case $TRAVIS_OS_NAME in
+  linux)
+    sudo apt-get -qq update
+    sudo apt-get install -y llvm-${LLVM_VERSION}-dev libclang-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
+
+    # FIXME: several ugly fixes since the Travis CI image is shipped
+    #        with a pre-configured version of LLVM:
+    #        - /usr/bin/llvm-config is configured to point to the llvm-config
+    #          executable that comes with the llvm-${LLVM_VERSION} package
+    #        - the $PATH env. var. is modified to use executables from /usr/bin
+    #          in priority to be sure that /usr/bin/llvm-config will be used to
+    #          provide llvm-config (by default, the /usr/local/clang-VERSION/bin
+    #          directory is present in $PATH with a better priority)
+    sudo update-alternatives --install /usr/bin/llvm-config llvm-config $(llvm-config-${LLVM_VERSION} --bindir)/llvm-config 1
+    export PATH=/usr/bin:$PATH
+    ;;
+
+  osx)
+    brew update
+    brew install ${FORMULA:-llvm@$LLVM_VERSION}
+    brew link --force --overwrite ${FORMULA:-llvm@$LLVM_VERSION}
+
+    # FIXME: the "libclang.dylib" shared object is manually added to the ld
+    #        library path since the llvm the formula don't do it properly
+    brew list --verbose ${FORMULA:-llvm@$LLVM_VERSION} | grep "\.dylib$" | xargs -n1 -I{} ln -sf {} $(brew --prefix)/lib
+    ;;
+
+  *)
+    exit 1;;
+  esac
+
+  export CC=clang-${LLVM_VERSION}
+
+  set +x
+
+script:
+- make
+- bin/c2cr test.h

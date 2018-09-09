@@ -51,7 +51,9 @@ module Clang
       end
     end
 
+    p "---"
     includes.reverse_each do |path|
+      p path
       cflags.unshift "-I#{path}"
     end
   end
